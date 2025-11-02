@@ -16,9 +16,14 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
     strictPort: false,
-    // Allow all hosts (needed for Render deployment)
-    // This disables the host check which is safe for production deployments
-    allowedHosts: "all",
+    // Allow Render hosts (supports all .onrender.com subdomains)
+    allowedHosts: [
+      "trainify-ai-ko8x.onrender.com",
+      ".onrender.com", // Allow all Render subdomains
+      "localhost",
+      "127.0.0.1",
+    ],
+    cors: true,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
