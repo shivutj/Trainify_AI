@@ -78,8 +78,8 @@ Before you begin, ensure you have the following installed:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/shivutj/fit-muse-ai-82.git
-   cd fit-muse-ai-82
+   git clone https://github.com/shivutj/Trainify_AI.git
+   cd Trainify_AI
    ```
 
 2. **Install dependencies**
@@ -303,7 +303,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 If you encounter any issues or have questions:
 
-- Open an [Issue](https://github.com/shivutj/fit-muse-ai-82/issues) on GitHub
+- Open an [Issue](https://github.com/shivutj/Trainify_AI/issues) on GitHub
 - Check the [Deployment Guide](./DEPLOYMENT_GUIDE.md) for deployment help
 - Review the [troubleshooting section](./DEPLOYMENT_GUIDE.md#-troubleshooting)
 
