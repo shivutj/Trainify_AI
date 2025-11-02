@@ -54,7 +54,7 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
         <img 
           src={fitnessHero} 
           alt="Fitness gym" 
-          className="w-full h-[500px] object-cover opacity-20 blur-sm"
+          className="w-full h-full object-cover opacity-20 blur-sm"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/90 to-background" />
       </div>
@@ -63,55 +63,57 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-4xl mx-auto p-6"
+        className="relative z-10 w-full max-w-4xl mx-auto p-2 h-full overflow-y-auto"
       >
-      <Card className="shadow-[var(--shadow-card)]">
-        <CardHeader className="text-center space-y-2">
+      <Card className="shadow-[var(--shadow-card)] h-full">
+        <CardHeader className="text-center space-y-1 pb-3">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
           >
-            <Dumbbell className="w-16 h-16 mx-auto text-primary" />
+            <Dumbbell className="w-10 h-10 mx-auto text-primary" />
           </motion.div>
-          <CardTitle className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            AI Fitness Coach
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            Trainify AI
           </CardTitle>
-          <CardDescription className="text-lg">
+          <CardDescription className="text-sm">
             Get your personalized workout and diet plan powered by AI
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="pb-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Personal Info */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+              <div className="space-y-1">
+                <Label htmlFor="name" className="text-xs">Name</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="John Doe"
+                  placeholder="Your Name"
+                  className="h-9 text-sm"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
+              <div className="space-y-1">
+                <Label htmlFor="age" className="text-xs">Age</Label>
                 <Input
                   id="age"
                   type="number"
                   value={formData.age}
                   onChange={(e) => updateField("age", e.target.value)}
-                  placeholder="25"
+                  placeholder="23"
+                  className="h-9 text-sm"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
+              <div className="space-y-1">
+                <Label htmlFor="gender" className="text-xs">Gender</Label>
                 <Select value={formData.gender} onValueChange={(value) => updateField("gender", value)}>
-                  <SelectTrigger id="gender">
+                  <SelectTrigger id="gender" className="h-9 text-sm">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -122,38 +124,40 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="height">Height (cm)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="height" className="text-xs">Height (cm)</Label>
                 <Input
                   id="height"
                   type="number"
                   value={formData.height}
                   onChange={(e) => updateField("height", e.target.value)}
-                  placeholder="175"
+                  placeholder="150"
+                  className="h-9 text-sm"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight (kg)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="weight" className="text-xs">Weight (kg)</Label>
                 <Input
                   id="weight"
                   type="number"
                   value={formData.weight}
                   onChange={(e) => updateField("weight", e.target.value)}
-                  placeholder="70"
+                  placeholder="62"
+                  className="h-9 text-sm"
                   required
                 />
               </div>
 
               {/* Fitness Goals */}
-              <div className="space-y-2">
-                <Label htmlFor="goal" className="flex items-center gap-2">
-                  <Target className="w-4 h-4" />
+              <div className="space-y-1">
+                <Label htmlFor="goal" className="flex items-center gap-1 text-xs">
+                  <Target className="w-3 h-3" />
                   Fitness Goal
                 </Label>
                 <Select value={formData.goal} onValueChange={(value) => updateField("goal", value)}>
-                  <SelectTrigger id="goal">
+                  <SelectTrigger id="goal" className="h-9 text-sm">
                     <SelectValue placeholder="Select goal" />
                   </SelectTrigger>
                   <SelectContent>
@@ -165,10 +169,10 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="level">Fitness Level</Label>
+              <div className="space-y-1">
+                <Label htmlFor="level" className="text-xs">Fitness Level</Label>
                 <Select value={formData.level} onValueChange={(value) => updateField("level", value)}>
-                  <SelectTrigger id="level">
+                  <SelectTrigger id="level" className="h-9 text-sm">
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -179,13 +183,13 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="location" className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
+              <div className="space-y-1">
+                <Label htmlFor="location" className="flex items-center gap-1 text-xs">
+                  <MapPin className="w-3 h-3" />
                   Workout Location
                 </Label>
                 <Select value={formData.location} onValueChange={(value) => updateField("location", value)}>
-                  <SelectTrigger id="location">
+                  <SelectTrigger id="location" className="h-9 text-sm">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
@@ -196,13 +200,13 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="diet" className="flex items-center gap-2">
-                  <Utensils className="w-4 h-4" />
+              <div className="space-y-1">
+                <Label htmlFor="diet" className="flex items-center gap-1 text-xs">
+                  <Utensils className="w-3 h-3" />
                   Dietary Preference
                 </Label>
                 <Select value={formData.diet} onValueChange={(value) => updateField("diet", value)}>
-                  <SelectTrigger id="diet">
+                  <SelectTrigger id="diet" className="h-9 text-sm">
                     <SelectValue placeholder="Select diet" />
                   </SelectTrigger>
                   <SelectContent>
@@ -215,10 +219,10 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
               </div>
             </div>
 
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
               <Button
                 type="submit"
-                className="w-full h-14 text-lg font-semibold shadow-[var(--shadow-glow)]"
+                className="w-full h-10 text-sm font-semibold shadow-[var(--shadow-glow)]"
                 disabled={isLoading}
               >
                 {isLoading ? "Generating Your Plan..." : "Generate My AI Plan"}
