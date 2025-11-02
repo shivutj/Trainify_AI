@@ -48,7 +48,7 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
   };
 
   return (
-    <div className="relative h-full flex flex-col">
+    <div className="relative w-full flex flex-col">
       {/* Hero Background */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <img 
@@ -63,9 +63,9 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-4xl mx-auto p-2 h-full flex flex-col"
+        className="relative z-10 w-full max-w-4xl mx-auto p-2 sm:p-2 md:p-2 flex flex-col"
       >
-      <Card className="shadow-[var(--shadow-card)] h-full flex flex-col">
+      <Card className="shadow-[var(--shadow-card)] w-full flex flex-col">
         <CardHeader className="text-center space-y-1 pb-3">
           <motion.div
             initial={{ scale: 0 }}
@@ -81,7 +81,7 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
             Get your personalized workout and diet plan powered by AI
           </CardDescription>
         </CardHeader>
-        <CardContent className="pb-4 flex-1 flex flex-col">
+        <CardContent className="pb-4 px-4 sm:px-6 flex-1 flex flex-col">
           <form onSubmit={handleSubmit} className="space-y-3 flex-1 flex flex-col">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Personal Info */}

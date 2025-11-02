@@ -20,10 +20,10 @@ interface PlanDisplayProps {
 }
 
 export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerate, onBackToHome }: PlanDisplayProps) => {
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [currentTab, setCurrentTab] = useState("workout");
   const [generatedImages, setGeneratedImages] = useState<{ [key: string]: string }>({});
   const [generatingImages, setGeneratingImages] = useState<{ [key: string]: boolean }>({});
+  const [playingAudioKeys, setPlayingAudioKeys] = useState<{ [key: string]: HTMLAudioElement }>({});
   const { toast } = useToast();
 
   // Format workout plan with proper styling
@@ -45,34 +45,139 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect Markdown headings (## Day 1:, ### Section, etc.)
       if (/^#{1,3}\s+/.test(trimmedLine)) {
-        const headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove markdown formatting (#, **, etc.) and get clean text
+        let headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove leading dashes and spaces
+        headingText = headingText.replace(/^-\s*/, '').trim();
+        // Remove markdown bold (**text** -> text) - handle multiple asterisks
+        headingText = headingText.replace(/\*+/g, '').trim();
+        // Remove any remaining markdown formatting (underscores, backticks)
+        headingText = headingText.replace(/[_`]/g, '').trim();
+        // Clean up any colons and extra spaces
+        headingText = headingText.replace(/\s+/g, ' ').trim();
+        
         const headingLevel = trimmedLine.match(/^#+/)?.[0].length || 2;
         
-        if (/day\s+\d+/i.test(headingText)) {
+          if (/day\s+\d+/i.test(headingText) || /monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(headingText)) {
           dayIndex++;
+          const dayKey = `day-${dayIndex}`;
+          const isPlayingDay = !!playingAudioKeys[dayKey];
+          
+          // Get day content for speech
+          let dayContent = headingText + ". ";
+          let dayExercisesStart = index + 1;
+          for (let i = dayExercisesStart; i < lines.length; i++) {
+            const nextLine = lines[i]?.trim();
+            if (!nextLine) continue;
+            if (/^#{1,3}\s+.*day\s+\d+/i.test(nextLine) || /^day\s+\d+/i.test(nextLine) || /^\*\*.*day/i.test(nextLine) || /monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(nextLine)) break;
+            // Clean markdown from day content too
+            let cleanLine = nextLine.replace(/\*+/g, '').replace(/[_`#]/g, '').trim();
+            cleanLine = cleanLine.replace(/\s+/g, ' ').trim();
+            if (cleanLine) dayContent += cleanLine + ". ";
+            if (dayContent.length > 1000) break;
+          }
+
+          formatted.push(
+            <div key={`heading-${index}`} className={`mt-6 mb-4 first:mt-0 ${headingLevel === 2 ? 'mt-8' : 'mt-6'}`}>
+              <div className="flex items-center justify-between gap-2 mb-3 border-b-2 border-primary/20 pb-2">
+                <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-primary break-words`}>
+                  {headingText}
+                </h3>
+                <Button
+                  onClick={() => handleTextToSpeech(dayContent.trim(), dayKey)}
+                  variant={isPlayingDay ? "destructive" : "outline"}
+                  size="sm"
+                  className="gap-1 h-8 px-2 text-xs flex-shrink-0 whitespace-nowrap"
+                  title={isPlayingDay ? "Stop audio" : "Listen to day workout"}
+                >
+                  {isPlayingDay ? (
+                    <>
+                      <Square className="w-3 h-3" />
+                      <span>Stop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3 h-3" />
+                      <span>Listen</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          );
+        } else {
+          formatted.push(
+            <div key={`heading-${index}`} className={`mt-6 mb-4 first:mt-0 ${headingLevel === 2 ? 'mt-8' : 'mt-6'}`}>
+              <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-primary mb-3 border-b-2 border-primary/20 pb-2 break-words`}>
+                {headingText}
+              </h3>
+            </div>
+          );
         }
-        
-        formatted.push(
-          <div key={`heading-${index}`} className={`mt-6 mb-4 first:mt-0 ${headingLevel === 2 ? 'mt-8' : 'mt-6'}`}>
-            <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-primary mb-3 border-b-2 border-primary/20 pb-2`}>
-              {headingText}
-            </h3>
-          </div>
-        );
         return;
       }
 
-      // Detect day headers (Day 1, Day 2, etc.) without markdown
-      if (/^day\s+\d+/i.test(trimmedLine) || /^day\s+\d+:/.test(trimmedLine)) {
+      // Detect day headers (Day 1, Day 2, etc.) without markdown - also check for day names with asterisks
+      if (/^day\s+\d+/i.test(trimmedLine) || /^day\s+\d+:/.test(trimmedLine) || /^\*\*.*day/i.test(trimmedLine) || /monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(trimmedLine)) {
         dayIndex++;
-        currentDay = trimmedLine;
-        formatted.push(
-          <div key={`day-${dayIndex}`} className="mt-6 mb-4 first:mt-0">
-            <h3 className="text-xl font-bold text-primary mb-3 border-b-2 border-primary/20 pb-2">
-              {trimmedLine}
-            </h3>
-          </div>
-        );
+        // Clean markdown formatting from day header - remove all asterisks first
+        let cleanDayText = trimmedLine;
+        // Remove leading dashes and spaces
+        cleanDayText = cleanDayText.replace(/^-\s*/, '').trim();
+        // Remove leading/trailing asterisks
+        cleanDayText = cleanDayText.replace(/^\*+/, '').replace(/\*+$/, '').trim();
+        // Remove all asterisks anywhere
+        cleanDayText = cleanDayText.replace(/\*+/g, '').trim();
+        // Remove other markdown formatting
+        cleanDayText = cleanDayText.replace(/[_`#]/g, '').trim();
+        // Clean up extra spaces
+        cleanDayText = cleanDayText.replace(/\s+/g, ' ').trim();
+        currentDay = cleanDayText;
+        const dayKey = `day-${dayIndex}`;
+        const isPlayingDay = !!playingAudioKeys[dayKey];
+        
+        // Get day content for speech (all exercises in this day)
+        let dayContent = cleanDayText + ". ";
+        let dayExercisesStart = index + 1;
+        for (let i = dayExercisesStart; i < lines.length; i++) {
+          const nextLine = lines[i]?.trim();
+          if (!nextLine) continue;
+          if (/^day\s+\d+/i.test(nextLine) || /^#{1,3}\s+.*day\s+\d+/i.test(nextLine)) break;
+            // Clean markdown from day content
+            let cleanLine = nextLine.replace(/\*+/g, '').replace(/[_`#]/g, '').trim();
+            cleanLine = cleanLine.replace(/\s+/g, ' ').trim();
+            if (cleanLine) dayContent += cleanLine + ". ";
+          if (dayContent.length > 1000) break; // Limit content
+        }
+
+          formatted.push(
+            <div key={`day-${dayIndex}`} className="mt-6 mb-4 first:mt-0">
+              <div className="flex items-center justify-between gap-2 mb-3 border-b-2 border-primary/20 pb-2">
+                <h3 className="text-xl font-bold text-primary break-words flex-1">
+                  {cleanDayText}
+                </h3>
+                <Button
+                  onClick={() => handleTextToSpeech(dayContent.trim(), dayKey)}
+                  variant={isPlayingDay ? "destructive" : "outline"}
+                  size="sm"
+                  className="gap-1 h-8 px-2 text-xs flex-shrink-0 whitespace-nowrap"
+                  title={isPlayingDay ? "Stop audio" : "Listen to day workout"}
+                >
+                  {isPlayingDay ? (
+                    <>
+                      <Square className="w-3 h-3" />
+                      <span>Stop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3 h-3" />
+                      <span>Listen</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          );
         return;
       }
 
@@ -80,8 +185,9 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
       if (/^-\s+\*\*/.test(trimmedLine)) {
         const exerciseMatch = trimmedLine.match(/^-\s+\*\*(.+?):\*\*(.+)/);
         if (exerciseMatch) {
-          const exerciseName = exerciseMatch[1].trim();
-          const exerciseDetails = exerciseMatch[2].trim();
+          // Clean markdown formatting from exercise names and details
+          let exerciseName = exerciseMatch[1].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
+          let exerciseDetails = exerciseMatch[2].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           const imageKey = `workout-${index}`;
           const imageUrl = generatedImages[imageKey];
           const isGenerating = generatingImages[imageKey];
@@ -90,13 +196,13 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
           const cleanExerciseName = exerciseName.split(/[:\-,]/)[0].trim().toLowerCase();
           
           formatted.push(
-            <div key={`exercise-${index}`} className="mb-4 pl-4 border-l-4 border-primary/30">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-primary mb-1">
+            <div key={`exercise-${index}`} className="mb-3 pl-4 border-l-4 border-primary/30 overflow-hidden">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex-1 min-w-0 break-words">
+                  <p className="text-sm font-semibold text-primary mb-1 break-words">
                     {exerciseName}
                   </p>
-                  <p className="text-sm text-muted-foreground mb-2 ml-4">
+                  <p className="text-xs text-muted-foreground mb-1 ml-2 break-words">
                     {exerciseDetails}
                   </p>
                 </div>
@@ -105,10 +211,10 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
                   disabled={isGenerating}
                   variant="outline"
                   size="sm"
-                  className="gap-1 flex-shrink-0"
+                  className="gap-1 flex-shrink-0 text-xs h-7 px-2"
                 >
                   <ImageIcon className="w-3 h-3" />
-                  {isGenerating ? "Generating..." : "Image"}
+                  <span>{isGenerating ? "Gen..." : "Image"}</span>
                 </Button>
               </div>
               {imageUrl && (
@@ -123,10 +229,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
             </div>
           );
         } else {
+          // Clean asterisks from regular items
+          let cleanItem = trimmedLine.replace(/^-\s+/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           formatted.push(
             <div key={`item-${index}`} className="mb-3 pl-4 border-l-4 border-primary/30">
-              <p className="text-base font-medium text-foreground mb-1">
-                {trimmedLine.replace(/^-\s+/, '')}
+              <p className="text-base font-medium text-foreground mb-1 break-words">
+                {cleanItem}
               </p>
             </div>
           );
@@ -146,10 +254,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect numbered exercises (1., 2., 3., etc.)
       if (/^\d+[\.\)]/.test(trimmedLine)) {
+        // Remove asterisks from numbered items
+        let cleanNumbered = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`item-${index}`} className="mb-3 pl-4 border-l-4 border-primary/30">
-            <p className="text-base font-medium text-foreground mb-1">
-              {trimmedLine}
+            <p className="text-base font-medium text-foreground mb-1 break-words">
+              {cleanNumbered}
             </p>
           </div>
         );
@@ -158,26 +268,29 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect bullet points or dashes
       if (/^[-•*]\s/.test(trimmedLine)) {
+        // Remove asterisks from bullet points
+        let cleanBullet = trimmedLine.replace(/^[-•*]\s/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`bullet-${index}`} className="mb-2 ml-6">
-            <p className="text-base text-muted-foreground">
+            <p className="text-base text-muted-foreground break-words">
               <span className="text-primary mr-2">•</span>
-              {trimmedLine.replace(/^[-•*]\s/, '')}
+              {cleanBullet}
             </p>
           </div>
         );
         return;
       }
 
-      // Regular paragraphs with proper justification
+      // Regular paragraphs with proper justification - remove asterisks
+      let cleanPara = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
       formatted.push(
-        <p key={`para-${index}`} className="mb-3 text-base text-foreground/90 leading-7">
-          {trimmedLine}
+        <p key={`para-${index}`} className="mb-2 text-sm text-foreground/90 leading-6 break-words overflow-wrap-anywhere">
+          {cleanPara}
         </p>
       );
     });
 
-    return formatted.length > 0 ? formatted : <p className="text-base leading-7">{plan}</p>;
+    return formatted.length > 0 ? formatted : <p className="text-sm leading-6 break-words">{plan}</p>;
   };
 
   // Format diet plan with proper styling
@@ -197,12 +310,18 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect Markdown headings (## Breakfast, ### Section, etc.)
       if (/^#{1,3}\s+/.test(trimmedLine)) {
-        const headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove markdown formatting and asterisks
+        let headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove leading dashes and spaces
+        headingText = headingText.replace(/^-\s*/, '').trim();
+        headingText = headingText.replace(/\*+/g, '').trim();
+        headingText = headingText.replace(/[_`]/g, '').trim();
+        headingText = headingText.replace(/\s+/g, ' ').trim();
         const headingLevel = trimmedLine.match(/^#+/)?.[0].length || 2;
         
         formatted.push(
           <div key={`heading-${index}`} className={`mt-6 mb-4 first:mt-0 ${headingLevel === 2 ? 'mt-8' : 'mt-6'}`}>
-            <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-secondary mb-3 border-b-2 border-secondary/20 pb-2`}>
+            <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-secondary mb-3 border-b-2 border-secondary/20 pb-2 break-words`}>
               {headingText}
             </h3>
           </div>
@@ -212,10 +331,14 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect meal headers (Breakfast, Lunch, Dinner, etc.) without markdown
       if (/^(breakfast|lunch|dinner|snack|meal)/i.test(trimmedLine)) {
+        // Remove leading dashes and asterisks from meal headers
+        let cleanMealHeader = trimmedLine.replace(/^-\s*/, '').trim();
+        cleanMealHeader = cleanMealHeader.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
+        cleanMealHeader = cleanMealHeader.replace(/\s+/g, ' ').trim();
         formatted.push(
           <div key={`meal-${index}`} className="mt-5 mb-3 first:mt-0">
-            <h3 className="text-lg font-bold text-secondary mb-2">
-              {trimmedLine}
+            <h3 className="text-lg font-bold text-secondary mb-2 break-words">
+              {cleanMealHeader}
             </h3>
           </div>
         );
@@ -226,8 +349,9 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
       if (/^-\s+\*\*/.test(trimmedLine)) {
         const mealMatch = trimmedLine.match(/^-\s+\*\*(.+?):\*\*(.+)/);
         if (mealMatch) {
-          const mealName = mealMatch[1].trim();
-          const mealDetails = mealMatch[2].trim();
+          // Remove asterisks from meal names and details
+          let mealName = mealMatch[1].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
+          let mealDetails = mealMatch[2].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           const imageKey = `diet-${index}`;
           const imageUrl = generatedImages[imageKey];
           const isGenerating = generatingImages[imageKey];
@@ -269,10 +393,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
             </div>
           );
         } else {
+          // Clean asterisks from regular items
+          let cleanItem = trimmedLine.replace(/^-\s+/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           formatted.push(
             <div key={`item-${index}`} className="mb-3 pl-4 border-l-4 border-secondary/30">
-              <p className="text-base font-medium text-foreground mb-1">
-                {trimmedLine.replace(/^-\s+/, '')}
+              <p className="text-base font-medium text-foreground mb-1 break-words">
+                {cleanItem}
               </p>
             </div>
           );
@@ -282,9 +408,11 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect italic descriptions: *Description:* text
       if (/^\*\*?[Dd]escription:\*\*?\s/.test(trimmedLine) || /^\*\*?[Nn]ote:\*\*?\s/.test(trimmedLine)) {
+        // Remove all asterisks and markdown formatting
+        let cleanDesc = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
-          <div key={`desc-${index}`} className="mb-2 ml-6 italic text-sm text-muted-foreground">
-            {trimmedLine.replace(/^\*\*?/, '').replace(/\*\*?/, '')}
+          <div key={`desc-${index}`} className="mb-2 ml-6 italic text-sm text-muted-foreground break-words">
+            {cleanDesc}
           </div>
         );
         return;
@@ -292,10 +420,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect numbered items
       if (/^\d+[\.\)]/.test(trimmedLine)) {
+        // Remove asterisks from numbered items
+        let cleanNumbered = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`item-${index}`} className="mb-2 pl-4 border-l-4 border-secondary/30">
-            <p className="text-base text-foreground mb-1">
-              {trimmedLine}
+            <p className="text-base text-foreground mb-1 break-words">
+              {cleanNumbered}
             </p>
           </div>
         );
@@ -304,21 +434,24 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect bullet points or dashes
       if (/^[-•*]\s/.test(trimmedLine)) {
+        // Remove asterisks from bullet points
+        let cleanBullet = trimmedLine.replace(/^[-•*]\s/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`bullet-${index}`} className="mb-2 ml-6">
-            <p className="text-base text-muted-foreground">
+            <p className="text-base text-muted-foreground break-words">
               <span className="text-secondary mr-2">•</span>
-              {trimmedLine.replace(/^[-•*]\s/, '')}
+              {cleanBullet}
             </p>
           </div>
         );
         return;
       }
 
-      // Regular paragraphs with proper justification
+      // Regular paragraphs with proper justification - remove asterisks
+      let cleanPara = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
       formatted.push(
-        <p key={`para-${index}`} className="mb-3 text-base text-foreground/90 leading-7">
-          {trimmedLine}
+        <p key={`para-${index}`} className="mb-3 text-base text-foreground/90 leading-7 break-words">
+          {cleanPara}
         </p>
       );
     });
@@ -343,12 +476,18 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect Markdown headings (## Motivational Quote, ### Section, etc.)
       if (/^#{1,3}\s+/.test(trimmedLine)) {
-        const headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove markdown formatting and asterisks
+        let headingText = trimmedLine.replace(/^#+\s+/, '').trim();
+        // Remove leading dashes and spaces
+        headingText = headingText.replace(/^-\s*/, '').trim();
+        headingText = headingText.replace(/\*+/g, '').trim();
+        headingText = headingText.replace(/[_`]/g, '').trim();
+        headingText = headingText.replace(/\s+/g, ' ').trim();
         const headingLevel = trimmedLine.match(/^#+/)?.[0].length || 2;
         
         formatted.push(
           <div key={`heading-${index}`} className={`mt-6 mb-4 first:mt-0 ${headingLevel === 2 ? 'mt-8' : 'mt-6'}`}>
-            <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-accent mb-3 border-b-2 border-accent/20 pb-2`}>
+            <h3 className={`${headingLevel === 1 ? 'text-2xl' : headingLevel === 2 ? 'text-xl' : 'text-lg'} font-bold text-accent mb-3 border-b-2 border-accent/20 pb-2 break-words`}>
               {headingText}
             </h3>
           </div>
@@ -360,23 +499,26 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
       if (/^-\s+\*\*/.test(trimmedLine)) {
         const tipMatch = trimmedLine.match(/^-\s+\*\*(.+?):\*\*(.+)/);
         if (tipMatch) {
-          const tipName = tipMatch[1].trim();
-          const tipDetails = tipMatch[2].trim();
+          // Remove asterisks from tip names and details
+          let tipName = tipMatch[1].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
+          let tipDetails = tipMatch[2].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           formatted.push(
             <div key={`tip-item-${index}`} className="mb-3 pl-4 border-l-4 border-accent/30">
-              <p className="text-base font-semibold text-accent mb-1">
+              <p className="text-base font-semibold text-accent mb-1 break-words">
                 {tipName}
               </p>
-              <p className="text-sm text-muted-foreground mb-1 ml-4">
+              <p className="text-sm text-muted-foreground mb-1 ml-4 break-words">
                 {tipDetails}
               </p>
             </div>
           );
         } else {
+          // Clean asterisks from regular items
+          let cleanItem = trimmedLine.replace(/^-\s+/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           formatted.push(
             <div key={`item-${index}`} className="mb-3 pl-4 border-l-4 border-accent/30">
-              <p className="text-base font-medium text-foreground mb-1">
-                {trimmedLine.replace(/^-\s+/, '')}
+              <p className="text-base font-medium text-foreground mb-1 break-words">
+                {cleanItem}
               </p>
             </div>
           );
@@ -386,9 +528,11 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect italic descriptions: *Note:* text
       if (/^\*\*?[Nn]ote:\*\*?\s/.test(trimmedLine) || /^\*\*?[Dd]escription:\*\*?\s/.test(trimmedLine)) {
+        // Remove all asterisks and markdown formatting
+        let cleanDesc = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
-          <div key={`desc-${index}`} className="mb-2 ml-6 italic text-sm text-muted-foreground">
-            {trimmedLine.replace(/^\*\*?/, '').replace(/\*\*?/, '')}
+          <div key={`desc-${index}`} className="mb-2 ml-6 italic text-sm text-muted-foreground break-words">
+            {cleanDesc}
           </div>
         );
         return;
@@ -396,10 +540,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect quote patterns (quotes often in quotes or special format)
       if (/^["']/.test(trimmedLine) || (trimmedLine.includes('quote') && trimmedLine.length < 150)) {
-        const cleanQuote = trimmedLine.replace(/^["']|["']$/g, '').replace(/^["']|["']$/g, '');
+        // Remove asterisks from quotes
+        let cleanQuote = trimmedLine.replace(/^["']|["']$/g, '').replace(/^["']|["']$/g, '');
+        cleanQuote = cleanQuote.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`quote-${index}`} className="my-4 p-4 bg-accent/50 rounded-lg border-l-4 border-accent">
-            <p className="text-base italic text-foreground leading-7">
+            <p className="text-base italic text-foreground leading-7 break-words">
               {cleanQuote}
             </p>
           </div>
@@ -409,10 +555,12 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect numbered tips
       if (/^\d+[\.\)]/.test(trimmedLine)) {
+        // Remove asterisks from numbered items
+        let cleanNumbered = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`tip-${index}`} className="mb-3 pl-4 border-l-4 border-accent/30">
-            <p className="text-base text-foreground mb-1">
-              {trimmedLine}
+            <p className="text-base text-foreground mb-1 break-words">
+              {cleanNumbered}
             </p>
           </div>
         );
@@ -421,21 +569,24 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
 
       // Detect bullet points or dashes
       if (/^[-•*]\s/.test(trimmedLine)) {
+        // Remove asterisks from bullet points
+        let cleanBullet = trimmedLine.replace(/^[-•*]\s/, '').replace(/\*+/g, '').replace(/[_`]/g, '').trim();
         formatted.push(
           <div key={`bullet-${index}`} className="mb-2 ml-6">
-            <p className="text-base text-muted-foreground">
+            <p className="text-base text-muted-foreground break-words">
               <span className="text-accent mr-2">•</span>
-              {trimmedLine.replace(/^[-•*]\s/, '')}
+              {cleanBullet}
             </p>
           </div>
         );
         return;
       }
 
-      // Regular paragraphs with proper justification
+      // Regular paragraphs with proper justification - remove asterisks
+      let cleanPara = trimmedLine.replace(/\*+/g, '').replace(/[_`]/g, '').trim();
       formatted.push(
-        <p key={`para-${index}`} className="mb-3 text-base text-foreground/90 leading-7">
-          {trimmedLine}
+        <p key={`para-${index}`} className="mb-3 text-base text-foreground/90 leading-7 break-words">
+          {cleanPara}
         </p>
       );
     });
@@ -443,33 +594,53 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
     return formatted.length > 0 ? formatted : <p className="text-base leading-7">{plan}</p>;
   };
 
-  const handleStopSpeech = () => {
-    stopSpeech();
-    setIsPlayingAudio(false);
-  };
-
-  const handleTextToSpeech = async () => {
-    // If already playing, stop and return
-    if (isPlayingAudio) {
-      handleStopSpeech();
+  // Handle speech for specific content (day or exercise)
+  const handleTextToSpeech = async (text: string, key: string) => {
+    // If already playing this audio, stop it
+    if (playingAudioKeys[key]) {
+      stopSpeech(playingAudioKeys[key]);
+      setPlayingAudioKeys(prev => {
+        const newKeys = { ...prev };
+        delete newKeys[key];
+        return newKeys;
+      });
       return;
     }
 
-    setIsPlayingAudio(true);
+    // Stop any other playing audio
+    Object.values(playingAudioKeys).forEach(audio => stopSpeech(audio));
+    setPlayingAudioKeys({});
+
     try {
-      let textToRead = "";
-      if (currentTab === "workout") textToRead = workoutPlan;
-      else if (currentTab === "diet") textToRead = dietPlan;
-      else textToRead = motivationPlan;
-
-      // Limit text length for better performance (Web Speech API can handle longer text)
-      const text = textToRead.substring(0, 5000); // Increased limit since it's free
-
-      await textToSpeech(text, "default");
+      const audio = await textToSpeech(text);
       
-      // Note: onend event in textToSpeech will resolve the promise
-      // But we still need to update state when done
-      setIsPlayingAudio(false);
+      // Store the audio element
+      setPlayingAudioKeys(prev => ({ ...prev, [key]: audio }));
+
+      // Set up end handler
+      audio.onended = () => {
+        setPlayingAudioKeys(prev => {
+          const newKeys = { ...prev };
+          delete newKeys[key];
+          return newKeys;
+        });
+      };
+
+      audio.onerror = () => {
+        setPlayingAudioKeys(prev => {
+          const newKeys = { ...prev };
+          delete newKeys[key];
+          return newKeys;
+        });
+        toast({
+          title: "Error",
+          description: "Failed to play audio. Please try again.",
+          variant: "destructive",
+        });
+      };
+
+      // Play the audio
+      audio.play();
     } catch (error) {
       console.error("Error playing audio:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to play audio. Please try again.";
@@ -478,7 +649,11 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
         description: errorMessage,
         variant: "destructive",
       });
-      setIsPlayingAudio(false);
+      setPlayingAudioKeys(prev => {
+        const newKeys = { ...prev };
+        delete newKeys[key];
+        return newKeys;
+      });
     }
   };
 
@@ -711,25 +886,27 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-5xl mx-auto p-6 space-y-6 relative"
+      className="w-full max-w-5xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 relative"
     >
-      <div className="flex justify-between items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
         <div className="flex items-center gap-2">
-          <Button onClick={onBackToHome} variant="ghost" className="gap-2">
+          <Button onClick={onBackToHome} variant="ghost" className="gap-2 text-xs sm:text-sm">
             <Home className="w-4 h-4" />
-            Back to Home
+            <span className="hidden sm:inline">Back to Home</span>
+            <span className="sm:hidden">Home</span>
           </Button>
-          {/* Theme Toggle Button - Next to Back to Home */}
           <ThemeToggle />
         </div>
-        <div className="flex gap-3">
-          <Button onClick={onRegenerate} variant="outline" className="gap-2">
+        <div className="flex gap-2 sm:gap-3">
+          <Button onClick={onRegenerate} variant="outline" className="gap-2 text-xs sm:text-sm flex-1 sm:flex-initial">
             <RefreshCw className="w-4 h-4" />
-            Regenerate Plan
+            <span className="hidden sm:inline">Regenerate Plan</span>
+            <span className="sm:hidden">Regenerate</span>
           </Button>
-          <Button onClick={handleExportPDF} className="gap-2">
+          <Button onClick={handleExportPDF} className="gap-2 text-xs sm:text-sm flex-1 sm:flex-initial">
             <Download className="w-4 h-4" />
-            Export as PDF
+            <span className="hidden sm:inline">Export as PDF</span>
+            <span className="sm:hidden">PDF</span>
           </Button>
         </div>
       </div>
@@ -759,21 +936,10 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="workout-plan-content text-justify leading-relaxed">
-                {formatWorkoutPlan(workoutPlan)}
-              </div>
-              <div className="flex gap-3 pt-4">
-                {isPlayingAudio ? (
-                  <Button onClick={handleStopSpeech} variant="destructive" className="gap-2">
-                    <Square className="w-4 h-4" />
-                    Stop Playing
-                  </Button>
-                ) : (
-                  <Button onClick={handleTextToSpeech} className="gap-2">
-                    <Volume2 className="w-4 h-4" />
-                    Read My Plan
-                  </Button>
-                )}
+              <div className="workout-plan-content text-justify leading-relaxed overflow-hidden break-words max-w-full">
+                <div className="prose prose-sm max-w-none">
+                  {formatWorkoutPlan(workoutPlan)}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -791,19 +957,6 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
               <div className="diet-plan-content text-justify leading-relaxed">
                 {formatDietPlan(dietPlan)}
               </div>
-              <div className="flex gap-3 pt-4">
-                {isPlayingAudio ? (
-                  <Button onClick={handleStopSpeech} variant="destructive" className="gap-2">
-                    <Square className="w-4 h-4" />
-                    Stop Playing
-                  </Button>
-                ) : (
-                  <Button onClick={handleTextToSpeech} className="gap-2">
-                    <Volume2 className="w-4 h-4" />
-                    Read My Plan
-                  </Button>
-                )}
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -819,19 +972,6 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
             <CardContent className="space-y-4">
               <div className="motivation-plan-content text-justify leading-relaxed">
                 {formatMotivationPlan(motivationPlan)}
-              </div>
-              <div className="pt-4">
-                {isPlayingAudio ? (
-                  <Button onClick={handleStopSpeech} variant="destructive" className="gap-2">
-                    <Square className="w-4 h-4" />
-                    Stop Playing
-                  </Button>
-                ) : (
-                  <Button onClick={handleTextToSpeech} className="gap-2">
-                    <Volume2 className="w-4 h-4" />
-                    Read My Plan
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>

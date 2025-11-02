@@ -4,7 +4,7 @@ import { PlanDisplay } from "@/components/PlanDisplay";
 import { StreakCalendar } from "@/components/StreakCalendar";
 import { MotivationalQuote } from "@/components/MotivationalQuote";
 import { SuggestedReads } from "@/components/SuggestedReads";
-import { generatePlan } from "@/lib/api";
+import { generateAllPlans } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
@@ -55,12 +55,8 @@ const Index = () => {
     setUserDetails(details);
 
     try {
-      // Generate all three plans in parallel using direct API calls
-      const [workoutPlanText, dietPlanText, motivationPlanText] = await Promise.all([
-        generatePlan(details, "workout"),
-        generatePlan(details, "diet"),
-        generatePlan(details, "motivation"),
-      ]);
+      // Generate all three plans in ONE optimized API call (uses cache, stable model, single request)
+      const { workout: workoutPlanText, diet: dietPlanText, motivation: motivationPlanText } = await generateAllPlans(details);
 
       setWorkoutPlan(workoutPlanText);
       setDietPlan(dietPlanText);
@@ -138,8 +134,8 @@ const Index = () => {
   });
 
   return (
-    <div className={`${!showPlans ? 'h-screen overflow-hidden' : 'min-h-screen overflow-auto'} bg-gradient-to-br from-background via-background to-muted/20`}>
-      <div className={`container mx-auto ${!showPlans ? 'py-2 h-full flex flex-col' : 'py-4'} relative`}>
+    <div className={`${!showPlans ? 'min-h-screen overflow-auto' : 'min-h-screen overflow-auto'} bg-gradient-to-br from-background via-background to-muted/20`}>
+      <div className={`container mx-auto px-4 ${!showPlans ? 'py-2 sm:py-2 md:py-2 min-h-screen flex flex-col' : 'py-4'} relative`}>
         {!showPlans ? (
           <>
             {/* Motivational Quote with Animated Emoji */}
@@ -147,15 +143,15 @@ const Index = () => {
               <MotivationalQuote />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0 overflow-hidden">
-              <div className="lg:col-span-7 flex flex-col min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 w-full">
+              <div className="lg:col-span-7 flex flex-col w-full">
                 <UserForm onSubmit={generatePlans} isLoading={isLoading} />
               </div>
-              <div className="lg:col-span-5 grid grid-cols-1 gap-3 min-h-0 overflow-hidden">
-                <div className="flex-shrink-0 min-h-0">
+              <div className="lg:col-span-5 grid grid-cols-1 gap-3 w-full">
+                <div className="w-full">
                   <StreakCalendar />
                 </div>
-                <div className="flex-shrink-0 min-h-0">
+                <div className="w-full">
                   <SuggestedReads />
                 </div>
               </div>
