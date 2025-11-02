@@ -31,13 +31,18 @@ export const StreakCalendar = () => {
     loadStreakData();
   }, []);
 
-  // Listen for storage changes and refresh
+  // Listen for storage changes and custom events (for same-window updates)
   useEffect(() => {
     const handleStorageChange = () => {
       loadStreakData();
     };
+    
+    const handleStreakUpdate = () => {
+      loadStreakData();
+    };
 
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("streak-update", handleStreakUpdate);
     
     // Also check periodically (in case of same-window updates)
     const interval = setInterval(() => {
@@ -46,6 +51,7 @@ export const StreakCalendar = () => {
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("streak-update", handleStreakUpdate);
       clearInterval(interval);
     };
   }, []);

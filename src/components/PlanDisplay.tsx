@@ -32,10 +32,16 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
     
     const lines = plan.split('\n');
     const formatted: JSX.Element[] = [];
+    const processedIndices = new Set<number>();
     let currentDay = '';
     let dayIndex = 0;
 
     lines.forEach((line, index) => {
+      // Skip if this line was already processed (e.g., as a description)
+      if (processedIndices.has(index)) {
+        return;
+      }
+      
       const trimmedLine = line.trim();
       
       if (!trimmedLine) {
@@ -188,6 +194,19 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
           // Clean markdown formatting from exercise names and details
           let exerciseName = exerciseMatch[1].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
           let exerciseDetails = exerciseMatch[2].trim().replace(/\*+/g, '').replace(/[_`]/g, '').trim();
+          
+          // Check if next line is a description
+          let exerciseDescription = '';
+          const nextLineIndex = index + 1;
+          if (nextLineIndex < lines.length) {
+            const nextLine = lines[nextLineIndex]?.trim();
+            if (nextLine && (/^\*[Dd]escription:\*\s/.test(nextLine) || /^\*[Dd]escription:\s/.test(nextLine))) {
+              exerciseDescription = nextLine.replace(/^\*[Dd]escription:\*\s*/, '').replace(/^\*[Dd]escription:\s*/, '').replace(/\*+/g, '').trim();
+              // Mark next line as processed
+              processedIndices.add(nextLineIndex);
+            }
+          }
+          
           const imageKey = `workout-${index}`;
           const imageUrl = generatedImages[imageKey];
           const isGenerating = generatingImages[imageKey];
@@ -205,6 +224,11 @@ export const PlanDisplay = ({ workoutPlan, dietPlan, motivationPlan, onRegenerat
                   <p className="text-xs text-muted-foreground mb-1 ml-2 break-words">
                     {exerciseDetails}
                   </p>
+                  {exerciseDescription && (
+                    <p className="text-xs italic text-muted-foreground/80 mt-1 ml-4 break-words">
+                      {exerciseDescription}
+                    </p>
+                  )}
                 </div>
                 <Button
                   onClick={() => handleGenerateImage(cleanExerciseName, imageKey, "exercise")}

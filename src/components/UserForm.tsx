@@ -63,10 +63,10 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-4xl mx-auto p-2 sm:p-2 md:p-2 flex flex-col"
+        className="relative z-10 w-full max-w-4xl mx-auto p-1 sm:p-1 md:p-1 flex flex-col lg:h-full md:h-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden"
       >
-      <Card className="shadow-[var(--shadow-card)] w-full flex flex-col">
-        <CardHeader className="text-center space-y-1 pb-3">
+      <Card className="shadow-[var(--shadow-card)] w-full flex flex-col lg:h-full md:h-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
+        <CardHeader className="text-center space-y-0.5 pb-2 flex-shrink-0">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -81,9 +81,9 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
             Get your personalized workout and diet plan powered by AI
           </CardDescription>
         </CardHeader>
-        <CardContent className="pb-4 px-4 sm:px-6 flex-1 flex flex-col">
-          <form onSubmit={handleSubmit} className="space-y-3 flex-1 flex flex-col">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <CardContent className="pb-2 px-3 sm:px-4 flex-1 flex flex-col lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
+          <form onSubmit={handleSubmit} className="space-y-2 flex-1 flex flex-col lg:min-h-0 md:min-h-0 lg:overflow-y-auto md:overflow-y-auto overflow-y-visible">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-shrink-0">
               {/* Personal Info */}
               <div className="space-y-1">
                 <Label htmlFor="name" className="text-xs">Name</Label>
@@ -219,12 +219,10 @@ export const UserForm = ({ onSubmit, isLoading }: UserFormProps) => {
               </div>
             </div>
 
-            <div className="flex-1"></div>
-
-            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1 mt-auto">
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1 mt-auto flex-shrink-0">
               <Button
                 type="submit"
-                className="w-full h-10 text-sm font-semibold shadow-[var(--shadow-glow)]"
+                className="w-full h-9 text-sm font-semibold shadow-[var(--shadow-glow)]"
                 disabled={isLoading}
               >
                 {isLoading ? "Generating Your Plan..." : "Generate My AI Plan"}

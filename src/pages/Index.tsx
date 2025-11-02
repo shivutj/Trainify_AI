@@ -79,23 +79,24 @@ const Index = () => {
       streakData[today] = true;
       localStorage.setItem("fitnessStreak", JSON.stringify(streakData));
       
-      // Trigger storage event so StreakCalendar updates
-      window.dispatchEvent(new Event("storage"));
+      // Trigger custom event so StreakCalendar updates (works for same-window updates)
+      window.dispatchEvent(new CustomEvent("streak-update"));
       
       toast({
         title: "Success!",
         description: "Your personalized fitness plan is ready!",
       });
     } catch (error) {
+      // Silently handle errors - default plans should already be returned from API
       console.error("Error generating plans:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to generate plans. Please check that API keys are configured in .env file.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Only show error if it's a critical configuration issue
+      if (error instanceof Error && error.message.includes("not configured")) {
+        toast({
+          title: "Configuration Error",
+          description: "Please configure API keys in .env file.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -134,24 +135,24 @@ const Index = () => {
   });
 
   return (
-    <div className={`${!showPlans ? 'min-h-screen overflow-auto' : 'min-h-screen overflow-auto'} bg-gradient-to-br from-background via-background to-muted/20`}>
-      <div className={`container mx-auto px-4 ${!showPlans ? 'py-2 sm:py-2 md:py-2 min-h-screen flex flex-col' : 'py-4'} relative`}>
+    <div className={`${!showPlans ? 'min-h-screen lg:h-screen md:h-screen overflow-auto lg:overflow-hidden md:overflow-hidden' : 'min-h-screen overflow-auto'} bg-gradient-to-br from-background via-background to-muted/20`}>
+      <div className={`container mx-auto px-4 ${!showPlans ? 'py-1 lg:h-full md:h-full flex flex-col' : 'py-4'} relative`}>
         {!showPlans ? (
           <>
             {/* Motivational Quote with Animated Emoji */}
-            <div className="mb-2 flex-shrink-0">
+            <div className="mb-1 flex-shrink-0">
               <MotivationalQuote />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 w-full">
-              <div className="lg:col-span-7 flex flex-col w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 lg:flex-1 md:flex-1 w-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
+              <div className="lg:col-span-7 flex flex-col w-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
                 <UserForm onSubmit={generatePlans} isLoading={isLoading} />
               </div>
-              <div className="lg:col-span-5 grid grid-cols-1 gap-3 w-full">
-                <div className="w-full">
+              <div className="lg:col-span-5 grid grid-cols-1 gap-2 w-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
+                <div className="w-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
                   <StreakCalendar />
                 </div>
-                <div className="w-full">
+                <div className="w-full lg:min-h-0 md:min-h-0 lg:overflow-hidden md:overflow-hidden">
                   <SuggestedReads />
                 </div>
               </div>

@@ -18,18 +18,107 @@ export interface UserDetails {
 const planCache = new Map<string, { workout: string; diet: string; motivation: string; timestamp: number }>();
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
+// Generate default plans (used when API fails)
+function generateDefaultPlans(userDetails: UserDetails): { workout: string; diet: string; motivation: string } {
+  const goal = userDetails.goal || 'maintenance';
+  const level = userDetails.level || 'beginner';
+  const diet = userDetails.diet || 'non-vegetarian';
+  
+  const workoutPlan = `## Day 1: Full Body Strength
+- **Push-ups:** 3×12 (60s rest)
+  *Description:* Keep your core tight and body in a straight line throughout the movement.
+- **Squats:** 3×15 (60s rest)
+  *Description:* Lower your body as if sitting back into a chair, keeping knees behind toes.
+- **Plank:** 3×30s (45s rest)
+  *Description:* Hold your body in a straight line from head to heels.
+
+## Day 2: Upper Body Focus
+- **Dumbbell Rows:** 3×10 (60s rest)
+  *Description:* Pull weights toward your lower chest, squeezing shoulder blades together.
+- **Shoulder Press:** 3×10 (60s rest)
+  *Description:* Press weights overhead with control, keeping core engaged.
+- **Tricep Dips:** 3×12 (45s rest)
+  *Description:* Lower body by bending elbows, keeping them close to your sides.
+
+## Day 3: Lower Body & Core
+- **Lunges:** 3×12 each leg (60s rest)
+  *Description:* Step forward and lower your back knee toward the ground.
+- **Deadlifts:** 3×10 (60s rest)
+  *Description:* Hinge at hips, keeping back straight and chest up.
+- **Mountain Climbers:** 3×20 (45s rest)
+  *Description:* Alternate bringing knees toward chest in a running motion.
+
+## Day 4: Cardio & Endurance
+- **Jumping Jacks:** 3×20 (30s rest)
+  *Description:* Jump feet apart while raising arms overhead.
+- **Burpees:** 3×10 (60s rest)
+  *Description:* Squat down, jump back to plank, do push-up, jump forward, jump up.
+- **High Knees:** 3×30s (30s rest)
+  *Description:* Run in place, bringing knees up toward chest.
+
+## Day 5: Full Body Circuit
+- **Kettlebell Swings:** 3×15 (60s rest)
+  *Description:* Swing weight from between legs to chest height using hip drive.
+- **Pull-ups:** 3×8 (60s rest)
+  *Description:* Pull your body up until chin clears the bar, lower with control.
+- **Russian Twists:** 3×20 each side (45s rest)
+  *Description:* Rotate torso side to side while holding a weight or body.
+
+## Day 6: Active Recovery
+- **Light Jogging:** 20 minutes (continuous)
+  *Description:* Maintain a comfortable pace where you can hold a conversation.
+- **Yoga Stretches:** 15 minutes (continuous)
+  *Description:* Focus on holding stretches for 30 seconds each, breathing deeply.
+- **Walking:** 10 minutes (continuous)
+  *Description:* Take a relaxed walk to promote blood flow and recovery.
+
+## Day 7: Rest Day
+Rest and recovery are essential for muscle growth and preventing injury.`;
+
+  const dietPlan = `## Breakfast
+- **Oatmeal with Berries:** 1 cup cooked oats with fresh mixed berries
+- **Scrambled Eggs:** 2 whole eggs with vegetables
+- **Greek Yogurt:** 1 cup with honey and nuts
+
+## Lunch
+- **Grilled Chicken Salad:** 200g chicken breast with mixed greens
+- **Quinoa Bowl:** 1 cup quinoa with roasted vegetables
+- **Brown Rice with Fish:** 150g fish with 1 cup brown rice
+
+## Dinner
+- **Salmon with Sweet Potato:** 200g salmon with roasted sweet potato
+- **Vegetable Stir-fry:** Mixed vegetables with lean protein
+- **Lentil Soup:** 1 bowl with whole grain bread`;
+
+  const motivationPlan = `## Motivational Quote
+"Success is the sum of small efforts repeated day in and day out."
+
+## Daily Tips
+- **Morning Routine:** Start your day with 10 minutes of stretching and deep breathing
+- **Stay Hydrated:** Drink at least 8 glasses of water throughout the day
+
+## Daily Affirmation
+"I am capable, strong, and committed to achieving my fitness goals."`;
+
+  return { workout: workoutPlan, diet: dietPlan, motivation: motivationPlan };
+}
+
 // Generate all three plans in ONE API call (optimized for hackathon)
 export async function generateAllPlans(userDetails: UserDetails): Promise<{ workout: string; diet: string; motivation: string }> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("VITE_GEMINI_API_KEY is not configured in .env file");
-  }
-
   // Check cache first
   const cacheKey = JSON.stringify(userDetails);
   const cached = planCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     console.log("Using cached plans");
     return { workout: cached.workout, diet: cached.diet, motivation: cached.motivation };
+  }
+
+  // If no API key, silently use defaults
+  if (!GEMINI_API_KEY) {
+    console.log("No API key found, using default plans");
+    const defaultPlans = generateDefaultPlans(userDetails);
+    planCache.set(cacheKey, { ...defaultPlans, timestamp: Date.now() });
+    return defaultPlans;
   }
 
   const formattingInstructions = `Format: Use Markdown. - **Item:** Details. No emojis or special chars.`;
@@ -46,15 +135,21 @@ Separate with "===WORKOUT===" "===DIET===" "===MOTIVATION===":
    Format each day clearly:
    ## Day 1: Full Body
    - **Exercise 1:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    - **Exercise 2:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    - **Exercise 3:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    
    ## Day 2: Upper Body
    - **Exercise 1:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    - **Exercise 2:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    - **Exercise 3:** Sets×Reps (Rest)
+     *Description:* Brief one-line description of the exercise.
    
-   Continue for all 7 days. No descriptions. Just exercise name, sets, reps, rest.
+   Continue for all 7 days. Add brief one-line descriptions after each exercise.
 
 2. DIET: Breakfast, Lunch, Dinner only. Format: - **Meal:** Portion. No calories/descriptions.
 
@@ -86,57 +181,30 @@ Keep it SHORT. Separate each day clearly with ## Day X: heading.`;
   );
 
   if (!response.ok) {
-    let errorData;
-    try {
-      errorData = await response.json();
-    } catch {
-      const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
-      if (response.status === 429) {
-        throw new Error("Rate limit exceeded. You've used all 50 free requests for today. The quota resets tomorrow, or upgrade to a paid plan for higher limits.");
-      }
-      if (response.status === 403) {
-        throw new Error("Invalid API key or insufficient permissions.");
-      }
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
-    console.error("Gemini API error:", response.status, errorData);
-    
-    if (response.status === 429) {
-      let retryMessage = "You've exceeded the free tier limit of 50 requests per day.";
-      const retryInfo = errorData.error?.details?.find((d: any) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo");
-      if (retryInfo?.retryDelay) {
-        let delaySeconds = typeof retryInfo.retryDelay === 'string' 
-          ? parseFloat(retryInfo.retryDelay.replace('s', ''))
-          : parseFloat(retryInfo.retryDelay);
-        if (delaySeconds > 1000) delaySeconds = delaySeconds / 1000;
-        const seconds = Math.ceil(delaySeconds);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        if (minutes > 0) {
-          retryMessage += ` Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}${remainingSeconds > 0 ? ` and ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''}` : ''}, or upgrade to a paid plan for higher limits.`;
-        } else {
-          retryMessage += ` Please try again in ${seconds} second${seconds > 1 ? 's' : ''}, or upgrade to a paid plan for higher limits.`;
-        }
-      } else {
-        retryMessage += " The quota resets tomorrow, or you can upgrade to a paid plan for higher limits.";
-      }
-      throw new Error(retryMessage);
-    }
-    
-    if (response.status === 403) {
-      throw new Error("Invalid API key or insufficient permissions. Please check your API key configuration.");
-    }
-    
-    const errorMessage = errorData.error?.message || `Gemini API error: ${response.status}`;
-    throw new Error(errorMessage);
+    // On any API error, silently use default plans (no error indication to user)
+    console.log("API request failed, using default plans");
+    const defaultPlans = generateDefaultPlans(userDetails);
+    planCache.set(cacheKey, { ...defaultPlans, timestamp: Date.now() });
+    return defaultPlans;
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    // On parse error, silently use defaults
+    console.log("Failed to parse API response, using default plans");
+    const defaultPlans = generateDefaultPlans(userDetails);
+    planCache.set(cacheKey, { ...defaultPlans, timestamp: Date.now() });
+    return defaultPlans;
+  }
   
   if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-    throw new Error("Invalid response format from Gemini API");
+    // On invalid response format, silently use defaults
+    console.log("Invalid API response format, using default plans");
+    const defaultPlans = generateDefaultPlans(userDetails);
+    planCache.set(cacheKey, { ...defaultPlans, timestamp: Date.now() });
+    return defaultPlans;
   }
 
   const fullText = data.candidates[0].content.parts[0].text;
@@ -147,9 +215,17 @@ Keep it SHORT. Separate each day clearly with ## Day X: heading.`;
   const motivationMatch = fullText.split(/===MOTIVATION===/)[1]?.trim();
 
   // Fallback parsing if delimiters aren't found
-  let workout = workoutMatch || fullText.split("# Workout")[1]?.split("# Diet")[0]?.trim() || "Workout plan could not be parsed. Please try again.";
-  let diet = dietMatch || fullText.split("# Diet")[1]?.split("# Motivation")[0]?.trim() || fullText.split("## Diet")[1]?.split("## Motivation")[0]?.trim() || "Diet plan could not be parsed. Please try again.";
-  let motivation = motivationMatch || fullText.split("# Motivation")[1]?.trim() || fullText.split("## Motivation")[1]?.trim() || "Motivation plan could not be parsed. Please try again.";
+  let workout = workoutMatch || fullText.split("# Workout")[1]?.split("# Diet")[0]?.trim();
+  let diet = dietMatch || fullText.split("# Diet")[1]?.split("# Motivation")[0]?.trim() || fullText.split("## Diet")[1]?.split("## Motivation")[0]?.trim();
+  let motivation = motivationMatch || fullText.split("# Motivation")[1]?.trim() || fullText.split("## Motivation")[1]?.trim();
+
+  // If parsing failed, use defaults
+  if (!workout || !diet || !motivation) {
+    console.log("Failed to parse plan sections, using default plans");
+    const defaultPlans = generateDefaultPlans(userDetails);
+    planCache.set(cacheKey, { ...defaultPlans, timestamp: Date.now() });
+    return defaultPlans;
+  }
 
   // Clean up any extra text
   workout = workout.split("===DIET===")[0].trim();
